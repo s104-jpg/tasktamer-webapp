@@ -1,4 +1,4 @@
-﻿@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 :root {
     --glass-bg: rgba(255, 255, 255, 0.08);
     --glass-border: rgba(255, 255, 255, 0.15);
@@ -70,3 +70,36 @@ body {
 .stat-item { text-align:center; padding:16px; background:rgba(255,255,255,0.05); border-radius:16px; }
 .stat-value { display:block; font-size:28px; font-weight:700; background:linear-gradient(135deg,var(--neon-purple),var(--neon-blue)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
 .stat-label { font-size:12px; color:var(--text-secondary); margin-top:4px; }
+
+.achievements-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+    gap: 12px;
+    margin-top: 10px;
+}
+.achievement-item {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    padding: 12px 8px;
+    text-align: center;
+    transition: all 0.3s;
+}
+.achievement-item.earned {
+    background: linear-gradient(135deg, rgba(168,85,247,0.3), rgba(59,130,246,0.3));
+    border-color: var(--neon-purple);
+    box-shadow: 0 0 15px rgba(168,85,247,0.3);
+}
+.achievement-icon {
+    font-size: 28px;
+    display: block;
+}
+.achievement-name {
+    font-size: 10px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+}
+.achievement-item.earned .achievement-name {
+    color: var(--text-primary);
+    font-weight: 600;
+}
