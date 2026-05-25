@@ -1,18 +1,18 @@
 const tg = window.Telegram.WebApp;
 tg.expand();
 
-// --- Достижения (синхронизируются с ботом вручную, можно хранить в localStorage) ---
+// --- Достижения ---
 const ACHIEVEMENTS = [
-    { key: "first_task", name: "Первый шаг", desc: "Создайте первую задачу", icon: "👶" },
-    { key: "first_complete", name: "Покоритель", desc: "Выполните первую задачу", icon: "✅" },
-    { key: "ten_tasks", name: "Десятка", desc: "Создайте 10 задач", icon: "🔟" },
-    { key: "fifty_tasks", name: "Полтинник", desc: "Создайте 50 задач", icon: "🪙" },
-    { key: "high_rating", name: "Отлично", desc: "Оцените выполнение на 10 баллов", icon: "🌟" },
-    { key: "perfect_week", name: "Идеальная неделя", desc: "Выполните 7 задач подряд", icon: "🔥" },
-    { key: "night_owl", name: "Ночная сова", desc: "Создайте задачу после 23:00", icon: "🦉" },
-    { key: "speedy", name: "Спринтер", desc: "Выполните задачу в течение часа", icon: "⚡" },
-    { key: "collector", name: "Коллекционер", desc: "Получите 5 разных достижений", icon: "🏅" },
-    { key: "comeback", name: "Возвращение", desc: "Вернитесь после 3 дней", icon: "👋" }
+    { key: "first_task", name: "Первый шаг", desc: "Создайте первую задачу", icon: "👶", check: (stats) => stats.total >= 1 },
+    { key: "first_complete", name: "Покоритель", desc: "Выполните первую задачу", icon: "✅", check: (stats) => stats.completed >= 1 },
+    { key: "ten_tasks", name: "Десятка", desc: "Создайте 10 задач", icon: "🔟", check: (stats) => stats.total >= 10 },
+    { key: "fifty_tasks", name: "Полтинник", desc: "Создайте 50 задач", icon: "🪙", check: (stats) => stats.total >= 50 },
+    { key: "high_rating", name: "Отлично", desc: "Оцените выполнение на 10 баллов", icon: "🌟", check: (stats) => stats.avgRating == 10 },
+    { key: "perfect_week", name: "Идеальная неделя", desc: "Выполните 7 задач подряд", icon: "🔥", check: (stats) => stats.streak >= 7 },
+    { key: "night_owl", name: "Ночная сова", desc: "Создайте задачу после 23:00", icon: "🦉", check: (stats) => stats.nightOwl },
+    { key: "speedy", name: "Спринтер", desc: "Выполните задачу в течение часа", icon: "⚡", check: (stats) => stats.speedy },
+    { key: "collector", name: "Коллекционер", desc: "Получите 5 разных достижений", icon: "🏅", check: (stats, earned) => earned.length >= 5 },
+    { key: "comeback", name: "Возвращение", desc: "Вернитесь после 3 дней", icon: "👋", check: (stats) => stats.comeback },
 ];
 let earnedAchievements = JSON.parse(localStorage.getItem('taskTamer_achievements') || '[]');
 
@@ -23,17 +23,54 @@ function updateAchievements() {
         grid.innerHTML = '<div class="empty-state"><span class="empty-icon">🔒</span><p>Пока нет достижений</p></div>';
         return;
     }
-    grid.innerHTML = earnedList.map(a => {
-        return `<div class="achievement-item earned">
-                    <span class="achievement-icon">${a.icon}</span>
-                    <span class="achievement-name">${a.name}</span>
-                </div>`;
-    }).join('');
+    grid.innerHTML = earnedList.map(a => `
+        <div class="achievement-item earned">
+            <span class="achievement-icon">${a.icon}</span>
+            <span class="achievement-name">${a.name}</span>
+        </div>
+    `).join('');
 }
+
+function checkAndAwardAchievements() {
+    const total = tasks.length;
+    const completed = tasks.filter(t => t.completed).length;
+    const ratings = tasks.filter(t => t.rating).map(t => t.rating);
+    const avgRating = ratings.length ? ratings.reduce((a,b) => a + b, 0) / ratings.length : 0;
+    const streak = parseInt(localStorage.getItem('taskTamer_streak') || '0');
+    const nightOwl = tasks.some(t => {
+        const hour = new Date(t.created).getHours();
+        return hour >= 23 || hour < 5;
+    });
+    const speedy = tasks.some(t => {
+        if (t.completed && t.created && t.completed_at) {
+            const created = new Date(t.created);
+            const completedAt = new Date(t.completed_at);
+            return (completedAt - created) / 1000 < 3600;
+        }
+        return false;
+    });
+    const comeback = localStorage.getItem('taskTamer_comeback') === 'true';
+
+    const stats = { total, completed, avgRating, streak, nightOwl, speedy, comeback };
+
+    ACHIEVEMENTS.forEach(a => {
+        if (!earnedAchievements.includes(a.key) && a.check(stats, earnedAchievements)) {
+            earnedAchievements.push(a.key);
+            // Отправляем боту (не обязательно, но для синхронизации)
+            try {
+                tg.sendData(JSON.stringify({ action: 'achievement_unlocked', key: a.key }));
+            } catch(e) {}
+        }
+    });
+    localStorage.setItem('taskTamer_achievements', JSON.stringify(earnedAchievements));
+    updateAchievements();
+}
+
 // Вызываем при старте
 updateAchievements();
+checkAndAwardAchievements();
 
-// --- Остальная логика задач ---
+// --- Задачи ---
 let tasks = JSON.parse(localStorage.getItem('taskTamer_tasks') || '[]');
 let selectedPeriod = 'day';
 
@@ -68,12 +105,12 @@ document.getElementById('createTaskBtn').addEventListener('click', () => {
             task_text: task.text,
             period: task.period
         }));
-        alert('Задача отправлена боту!');
     } catch (e) {
         alert('Ошибка отправки: ' + e.message);
     }
     
     document.getElementById('taskText').value = '';
+    checkAndAwardAchievements();  // Проверяем достижения
     updateUI();
 });
 
@@ -100,25 +137,19 @@ window.toggleTask = function(taskId) {
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
     task.completed = !task.completed;
+    if (task.completed) {
+        task.completed_at = new Date().toISOString();
+    }
     localStorage.setItem('taskTamer_tasks', JSON.stringify(tasks));
     if (task.completed) {
         try {
             tg.sendData(JSON.stringify({ action: 'task_completed', task_id: task.id }));
-            alert('Выполнение отмечено!');
         } catch (e) {
             alert('Ошибка отправки: ' + e.message);
         }
     }
+    checkAndAwardAchievements();  // Проверяем достижения при каждом изменении
     updateUI();
 };
-
-// Функция для ручного добавления ачивки (можно вызывать из консоли для теста)
-function earnAchievement(key) {
-    if (!earnedAchievements.includes(key)) {
-        earnedAchievements.push(key);
-        localStorage.setItem('taskTamer_achievements', JSON.stringify(earnedAchievements));
-        updateAchievements();
-    }
-}
 
 updateUI();
