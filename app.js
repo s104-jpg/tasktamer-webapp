@@ -55,7 +55,6 @@ updateAchievements();
 // === Задачи ===
 let tasks = JSON.parse(localStorage.getItem('taskTamer_tasks') || '[]');
 let selectedPeriod = 'day';
-let ratingTaskId = null;
 
 document.querySelectorAll('.period-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -68,7 +67,10 @@ document.querySelectorAll('.period-btn').forEach(btn => {
 // Кнопка создания задачи
 document.getElementById('createTaskBtn').addEventListener('click', () => {
     const text = document.getElementById('taskText').value.trim();
-    if (!text) { alert('Введи текст задачи!'); return; }
+    if (!text) { 
+        showToast('Введи текст задачи!');
+        return; 
+    }
     const task = {
         id: Date.now().toString(),
         text,
@@ -78,6 +80,8 @@ document.getElementById('createTaskBtn').addEventListener('click', () => {
     };
     tasks.unshift(task);
     localStorage.setItem('taskTamer_tasks', JSON.stringify(tasks));
+    
+    // Отправляем боту без закрытия приложения
     try {
         tg.sendData(JSON.stringify({
             action: 'task_created',
@@ -85,14 +89,49 @@ document.getElementById('createTaskBtn').addEventListener('click', () => {
             task_text: task.text,
             period: task.period
         }));
-    } catch(e) { alert('Ошибка отправки: ' + e.message); }
+        showToast('Задача создана! ✅');
+    } catch(e) { 
+        showToast('Ошибка: ' + e.message); 
+    }
+    
     document.getElementById('taskText').value = '';
     updateUI();
 });
 
-// Оценка задачи (внутри WebApp)
-function showRating(taskId) {
+// Выполнение задачи (НЕ закрывает приложение)
+window.toggleTask = function(taskId) {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    
+    if (!task.completed) {
+        task.completed = true;
+        task.completed_at = new Date().toISOString();
+        localStorage.setItem('taskTamer_tasks', JSON.stringify(tasks));
+        
+        // Отправляем боту
+        try {
+            tg.sendData(JSON.stringify({ action: 'task_completed', task_id: task.id }));
+        } catch(e) {}
+        
+        // Показываем оценку ВНУТРИ приложения
+        showRatingModal(taskId);
+    } else {
+        task.completed = false;
+        localStorage.setItem('taskTamer_tasks', JSON.stringify(tasks));
+    }
+    updateUI();
+};
+
+// === ОЦЕНКА ВНУТРИ ПРИЛОЖЕНИЯ ===
+let ratingTaskId = null;
+
+function showRatingModal(taskId) {
     ratingTaskId = taskId;
+    
+    // Удаляем старый модал если есть
+    const oldModal = document.querySelector('.rating-modal');
+    if (oldModal) oldModal.remove();
+    
     const modal = document.createElement('div');
     modal.className = 'rating-modal';
     modal.innerHTML = `
@@ -100,22 +139,24 @@ function showRating(taskId) {
             <h3>Оцени выполнение</h3>
             <div class="rating-stars">
                 ${[1,2,3,4,5,6,7,8,9,10].map(i => `
-                    <button class="star-btn" onclick="rateTask(${i})">${i}</button>
+                    <button class="star-btn" onclick="submitRating(${i})">${i}</button>
                 `).join('')}
             </div>
-            <button class="cancel-btn" onclick="closeRating()">Отмена</button>
+            <button class="cancel-btn" onclick="closeRatingModal()">Позже</button>
         </div>
     `;
     document.body.appendChild(modal);
 }
 
-function rateTask(rating) {
+function submitRating(rating) {
     if (!ratingTaskId) return;
     const task = tasks.find(t => t.id === ratingTaskId);
     if (task) {
         task.rating = rating;
         task.rated_at = new Date().toISOString();
         localStorage.setItem('taskTamer_tasks', JSON.stringify(tasks));
+        
+        // Отправляем оценку боту
         try {
             tg.sendData(JSON.stringify({
                 action: 'task_rated',
@@ -123,35 +164,34 @@ function rateTask(rating) {
                 rating: rating
             }));
         } catch(e) {}
+        
+        showToast(`Оценка: ${rating}/10 ⭐`);
     }
-    closeRating();
+    closeRatingModal();
     updateUI();
 }
 
-function closeRating() {
+function closeRatingModal() {
     const modal = document.querySelector('.rating-modal');
     if (modal) modal.remove();
     ratingTaskId = null;
 }
 
-// Выполнение задачи
-window.toggleTask = function(taskId) {
-    const task = tasks.find(t => t.id === taskId);
-    if (!task) return;
-    if (!task.completed) {
-        task.completed = true;
-        task.completed_at = new Date().toISOString();
-        localStorage.setItem('taskTamer_tasks', JSON.stringify(tasks));
-        try {
-            tg.sendData(JSON.stringify({ action: 'task_completed', task_id: task.id }));
-        } catch(e) {}
-        showRating(taskId); // Показываем оценку сразу после выполнения
-    } else {
-        task.completed = false;
-        localStorage.setItem('taskTamer_tasks', JSON.stringify(tasks));
-    }
-    updateUI();
-};
+// Всплывающее уведомление (вместо alert)
+function showToast(message) {
+    const existing = document.querySelector('.toast');
+    if (existing) existing.remove();
+    
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+    }, 2000);
+}
 
 function updateUI() {
     const list = document.getElementById('tasksList');
@@ -181,5 +221,77 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+
+// Добавляем стили для toast и rating-modal
+const style = document.createElement('style');
+style.textContent = `
+    .toast {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(168,85,247,0.9);
+        color: white;
+        padding: 12px 24px;
+        border-radius: 12px;
+        font-size: 14px;
+        z-index: 9999;
+        transition: opacity 0.3s;
+        pointer-events: none;
+    }
+    .rating-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9998;
+    }
+    .rating-content {
+        text-align: center;
+        padding: 24px;
+        max-width: 300px;
+        width: 90%;
+    }
+    .rating-content h3 {
+        margin-bottom: 16px;
+        color: #fff;
+    }
+    .rating-stars {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: center;
+        margin-bottom: 16px;
+    }
+    .star-btn {
+        width: 40px;
+        height: 40px;
+        border: 1px solid rgba(255,255,255,0.2);
+        border-radius: 50%;
+        background: rgba(255,255,255,0.1);
+        color: white;
+        font-size: 16px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .star-btn:hover {
+        background: rgba(168,85,247,0.5);
+        border-color: #a855f7;
+    }
+    .cancel-btn {
+        padding: 8px 16px;
+        background: rgba(255,255,255,0.1);
+        border: 1px solid rgba(255,255,255,0.2);
+        border-radius: 8px;
+        color: #fff;
+        cursor: pointer;
+    }
+`;
+document.head.appendChild(style);
 
 updateUI();
