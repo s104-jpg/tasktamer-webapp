@@ -1,4 +1,4 @@
-﻿const tg = window.Telegram.WebApp;
+const tg = window.Telegram.WebApp;
 tg.expand();
 
 let tasks = JSON.parse(localStorage.getItem('taskTamer_tasks') || '[]');
@@ -49,12 +49,12 @@ function updateUI() {
     if (tasks.length === 0) {
         list.innerHTML = '<div class="empty-state"><span class="empty-icon">🎈</span><p>Пока задач нет.</p></div>';
     } else {
-        list.innerHTML = tasks.map((t,i) => 
-            <div class="task-item " style="animation-delay:s">
-                <div class="task-checkbox " onclick="toggleTask('')"></div>
-                <div style="flex:1"><div style="font-weight:500"></div></div>
+        list.innerHTML = tasks.map((t,i) => `
+            <div class="task-item ${t.completed ? 'completed' : ''}" style="animation-delay:${i*0.05}s">
+                <div class="task-checkbox ${t.completed ? 'checked' : ''}" onclick="toggleTask('${t.id}')"></div>
+                <div style="flex:1"><div style="font-weight:500">${t.text}</div></div>
             </div>
-        ).join('');
+        `).join('');
     }
     document.getElementById('totalTasks').textContent = tasks.length;
     document.getElementById('completedTasks').textContent = tasks.filter(t => t.completed).length;
