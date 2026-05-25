@@ -18,9 +18,13 @@ let earnedAchievements = JSON.parse(localStorage.getItem('taskTamer_achievements
 
 function updateAchievements() {
     const grid = document.getElementById('achievementsList');
-    grid.innerHTML = ACHIEVEMENTS.map(a => {
-        const earned = earnedAchievements.includes(a.key);
-        return `<div class="achievement-item ${earned ? 'earned' : ''}">
+    const earnedList = ACHIEVEMENTS.filter(a => earnedAchievements.includes(a.key));
+    if (earnedList.length === 0) {
+        grid.innerHTML = '<div class="empty-state"><span class="empty-icon">🔒</span><p>Пока нет достижений</p></div>';
+        return;
+    }
+    grid.innerHTML = earnedList.map(a => {
+        return `<div class="achievement-item earned">
                     <span class="achievement-icon">${a.icon}</span>
                     <span class="achievement-name">${a.name}</span>
                 </div>`;
