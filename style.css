@@ -103,3 +103,13 @@ body {
     color: var(--text-primary);
     font-weight: 600;
 }
+
+.glass-card {
+    background: rgba(10, 10, 30, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 24px;
+    padding: 24px;
+    margin-bottom: 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    animation: cardAppear 0.6s cubic-bezier(0.16,1,0.3,1);
+}
