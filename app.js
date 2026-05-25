@@ -1,6 +1,35 @@
 const tg = window.Telegram.WebApp;
 tg.expand();
 
+// --- Достижения (синхронизируются с ботом вручную, можно хранить в localStorage) ---
+const ACHIEVEMENTS = [
+    { key: "first_task", name: "Первый шаг", desc: "Создайте первую задачу", icon: "👶" },
+    { key: "first_complete", name: "Покоритель", desc: "Выполните первую задачу", icon: "✅" },
+    { key: "ten_tasks", name: "Десятка", desc: "Создайте 10 задач", icon: "🔟" },
+    { key: "fifty_tasks", name: "Полтинник", desc: "Создайте 50 задач", icon: "🪙" },
+    { key: "high_rating", name: "Отлично", desc: "Оцените выполнение на 10 баллов", icon: "🌟" },
+    { key: "perfect_week", name: "Идеальная неделя", desc: "Выполните 7 задач подряд", icon: "🔥" },
+    { key: "night_owl", name: "Ночная сова", desc: "Создайте задачу после 23:00", icon: "🦉" },
+    { key: "speedy", name: "Спринтер", desc: "Выполните задачу в течение часа", icon: "⚡" },
+    { key: "collector", name: "Коллекционер", desc: "Получите 5 разных достижений", icon: "🏅" },
+    { key: "comeback", name: "Возвращение", desc: "Вернитесь после 3 дней", icon: "👋" }
+];
+let earnedAchievements = JSON.parse(localStorage.getItem('taskTamer_achievements') || '[]');
+
+function updateAchievements() {
+    const grid = document.getElementById('achievementsList');
+    grid.innerHTML = ACHIEVEMENTS.map(a => {
+        const earned = earnedAchievements.includes(a.key);
+        return `<div class="achievement-item ${earned ? 'earned' : ''}">
+                    <span class="achievement-icon">${a.icon}</span>
+                    <span class="achievement-name">${a.name}</span>
+                </div>`;
+    }).join('');
+}
+// Вызываем при старте
+updateAchievements();
+
+// --- Остальная логика задач ---
 let tasks = JSON.parse(localStorage.getItem('taskTamer_tasks') || '[]');
 let selectedPeriod = 'day';
 
@@ -78,5 +107,14 @@ window.toggleTask = function(taskId) {
     }
     updateUI();
 };
+
+// Функция для ручного добавления ачивки (бот может отправить сообщение, но автосинхронизации нет)
+function earnAchievement(key) {
+    if (!earnedAchievements.includes(key)) {
+        earnedAchievements.push(key);
+        localStorage.setItem('taskTamer_achievements', JSON.stringify(earnedAchievements));
+        updateAchievements();
+    }
+}
 
 updateUI();
