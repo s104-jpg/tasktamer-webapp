@@ -1,9 +1,48 @@
 const tg = window.Telegram.WebApp;
 tg.expand();
 
-console.log('TaskTamer v3 загружен');
+console.log('TaskTamer v5 - без закрытия');
 
-// === Восстановление данных из URL ===
+// === Хранилище Telegram Cloud ===
+const STORAGE_KEY = 'tasktamer_sync';
+
+// Сохранение в облако Telegram
+function syncToCloud(tasks, achievements) {
+    const data = JSON.stringify({ tasks, achievements });
+    tg.CloudStorage.setItem(STORAGE_KEY, data, (error, success) => {
+        if (error) console.error('Ошибка синхронизации:', error);
+        else console.log('Синхронизировано с облаком');
+    });
+}
+
+// Загрузка из облака Telegram
+function loadFromCloud() {
+    tg.CloudStorage.getItem(STORAGE_KEY, (error, value) => {
+        if (!error && value) {
+            try {
+                const data = JSON.parse(value);
+                if (data.tasks) {
+                    tasks = data.tasks;
+                    localStorage.setItem('taskTamer_tasks', JSON.stringify(tasks));
+                }
+                if (data.achievements) {
+                    earnedAchievements = data.achievements;
+                    localStorage.setItem('taskTamer_achievements', JSON.stringify(earnedAchievements));
+                }
+                updateUI();
+                updateAchievements();
+                console.log('Данные загружены из облака');
+            } catch(e) {
+                console.error('Ошибка парсинга:', e);
+            }
+        } else {
+            // Если облако пустое, загружаем из URL
+            loadStateFromURL();
+        }
+    });
+}
+
+// === Восстановление из URL (если облако пустое) ===
 function loadStateFromURL() {
     const urlParams = new URLSearchParams(window.location.search);
     const startParam = urlParams.get('start');
@@ -14,14 +53,20 @@ function loadStateFromURL() {
         for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
         const jsonStr = new TextDecoder('utf-8').decode(bytes);
         const state = JSON.parse(jsonStr);
-        if (state.tasks) localStorage.setItem('taskTamer_tasks', JSON.stringify(state.tasks));
-        if (state.achievements) localStorage.setItem('taskTamer_achievements', JSON.stringify(state.achievements));
-        console.log('Данные восстановлены из URL');
+        if (state.tasks) {
+            tasks = state.tasks;
+            localStorage.setItem('taskTamer_tasks', JSON.stringify(tasks));
+        }
+        if (state.achievements) {
+            earnedAchievements = state.achievements;
+            localStorage.setItem('taskTamer_achievements', JSON.stringify(earnedAchievements));
+        }
+        updateUI();
+        updateAchievements();
     } catch(e) {
         console.error('Ошибка восстановления:', e);
     }
 }
-loadStateFromURL();
 
 // === Достижения ===
 const ACHIEVEMENTS = [
@@ -50,11 +95,11 @@ function updateAchievements() {
         </div>
     `).join('');
 }
-updateAchievements();
 
 // === Задачи ===
 let tasks = JSON.parse(localStorage.getItem('taskTamer_tasks') || '[]');
 let selectedPeriod = 'day';
+let ratingTaskId = null;
 
 document.querySelectorAll('.period-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -64,7 +109,7 @@ document.querySelectorAll('.period-btn').forEach(btn => {
     });
 });
 
-// Кнопка создания задачи
+// Создание задачи (без sendData!)
 document.getElementById('createTaskBtn').addEventListener('click', () => {
     const text = document.getElementById('taskText').value.trim();
     if (!text) { 
@@ -80,25 +125,13 @@ document.getElementById('createTaskBtn').addEventListener('click', () => {
     };
     tasks.unshift(task);
     localStorage.setItem('taskTamer_tasks', JSON.stringify(tasks));
-    
-    // Отправляем боту без закрытия приложения
-    try {
-        tg.sendData(JSON.stringify({
-            action: 'task_created',
-            task_id: task.id,
-            task_text: task.text,
-            period: task.period
-        }));
-        showToast('Задача создана! ✅');
-    } catch(e) { 
-        showToast('Ошибка: ' + e.message); 
-    }
-    
+    syncToCloud(tasks, earnedAchievements);
+    showToast('Задача создана! ✅');
     document.getElementById('taskText').value = '';
     updateUI();
 });
 
-// Выполнение задачи (НЕ закрывает приложение)
+// Выполнение задачи (без sendData)
 window.toggleTask = function(taskId) {
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
@@ -107,28 +140,19 @@ window.toggleTask = function(taskId) {
         task.completed = true;
         task.completed_at = new Date().toISOString();
         localStorage.setItem('taskTamer_tasks', JSON.stringify(tasks));
-        
-        // Отправляем боту
-        try {
-            tg.sendData(JSON.stringify({ action: 'task_completed', task_id: task.id }));
-        } catch(e) {}
-        
-        // Показываем оценку ВНУТРИ приложения
+        syncToCloud(tasks, earnedAchievements);
         showRatingModal(taskId);
     } else {
         task.completed = false;
         localStorage.setItem('taskTamer_tasks', JSON.stringify(tasks));
+        syncToCloud(tasks, earnedAchievements);
     }
     updateUI();
 };
 
-// === ОЦЕНКА ВНУТРИ ПРИЛОЖЕНИЯ ===
-let ratingTaskId = null;
-
+// Оценка внутри приложения
 function showRatingModal(taskId) {
     ratingTaskId = taskId;
-    
-    // Удаляем старый модал если есть
     const oldModal = document.querySelector('.rating-modal');
     if (oldModal) oldModal.remove();
     
@@ -155,16 +179,7 @@ function submitRating(rating) {
         task.rating = rating;
         task.rated_at = new Date().toISOString();
         localStorage.setItem('taskTamer_tasks', JSON.stringify(tasks));
-        
-        // Отправляем оценку боту
-        try {
-            tg.sendData(JSON.stringify({
-                action: 'task_rated',
-                task_id: ratingTaskId,
-                rating: rating
-            }));
-        } catch(e) {}
-        
+        syncToCloud(tasks, earnedAchievements);
         showToast(`Оценка: ${rating}/10 ⭐`);
     }
     closeRatingModal();
@@ -177,7 +192,6 @@ function closeRatingModal() {
     ratingTaskId = null;
 }
 
-// Всплывающее уведомление (вместо alert)
 function showToast(message) {
     const existing = document.querySelector('.toast');
     if (existing) existing.remove();
@@ -222,7 +236,7 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// Добавляем стили для toast и rating-modal
+// Стили
 const style = document.createElement('style');
 style.textContent = `
     .toast {
@@ -277,9 +291,8 @@ style.textContent = `
         color: white;
         font-size: 16px;
         cursor: pointer;
-        transition: all 0.2s;
     }
-    .star-btn:hover {
+    .star-btn:active {
         background: rgba(168,85,247,0.5);
         border-color: #a855f7;
     }
@@ -294,4 +307,5 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-updateUI();
+// Загружаем данные при старте
+loadFromCloud();
