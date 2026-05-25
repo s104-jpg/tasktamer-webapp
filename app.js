@@ -112,7 +112,7 @@ window.toggleTask = function(taskId) {
     updateUI();
 };
 
-// Функция для ручного добавления ачивки (бот может отправить сообщение, но автосинхронизации нет)
+// Функция для ручного добавления ачивки (можно вызывать из консоли для теста)
 function earnAchievement(key) {
     if (!earnedAchievements.includes(key)) {
         earnedAchievements.push(key);
