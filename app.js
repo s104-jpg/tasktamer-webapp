@@ -1,7 +1,7 @@
 const tg = window.Telegram.WebApp;
 tg.expand();
 
-console.log('TaskTamer v8 - с язвительными фразами');
+console.log('TaskTamer v10 - иконки и цвета');
 
 // === Облачное хранилище ===
 const CLOUD_KEY = 'tasktamer_sync';
@@ -22,25 +22,41 @@ function loadFromCloud() {
                 const data = JSON.parse(val);
                 tasks = data.tasks || [];
                 earnedAchievements = data.achievements || [];
-                console.log('☁️ Загружено:', tasks.length, 'задач');
+                console.log('☁️ Загружено:', tasks.length, 'задач,', earnedAchievements.length, 'достижений');
             } catch(e) { console.error(e); }
         }
         updateUI();
         updateAchievements();
+        checkAndAwardAchievements();
     });
 }
 
-// === Достижения ===
+// === Достижения с авто-проверкой ===
 const ACHIEVEMENTS = [
-    { key: "first_task", name: "Первый шаг", icon: "👶" },
-    { key: "first_complete", name: "Покоритель", icon: "✅" },
-    { key: "ten_tasks", name: "Десятка", icon: "🔟" },
-    { key: "high_rating", name: "Отлично", icon: "🌟" },
-    { key: "night_owl", name: "Ночная сова", icon: "🦉" },
-    { key: "speedy", name: "Спринтер", icon: "⚡" },
-    { key: "comeback", name: "Возвращение", icon: "👋" },
+    { key: "first_task", name: "Первый шаг", icon: "👶", check: () => tasks.length >= 1 },
+    { key: "first_complete", name: "Покоритель", icon: "✅", check: () => tasks.filter(t => t.completed).length >= 1 },
+    { key: "ten_tasks", name: "Десятка", icon: "🔟", check: () => tasks.length >= 10 },
+    { key: "high_rating", name: "Отлично", icon: "🌟", check: () => tasks.some(t => t.rating === 10) },
+    { key: "night_owl", name: "Ночная сова", icon: "🦉", check: () => tasks.some(t => { const h = new Date(t.created).getHours(); return h >= 23 || h < 5; }) },
+    { key: "speedy", name: "Спринтер", icon: "⚡", check: () => tasks.some(t => t.completed && t.created && t.completed_at && (new Date(t.completed_at) - new Date(t.created)) < 3600000) },
+    { key: "comeback", name: "Возвращение", icon: "👋", check: () => false },
 ];
 let earnedAchievements = [];
+
+function checkAndAwardAchievements() {
+    let changed = false;
+    ACHIEVEMENTS.forEach(a => {
+        if (!earnedAchievements.includes(a.key) && a.check()) {
+            earnedAchievements.push(a.key);
+            changed = true;
+            toast(`🏆 Достижение: ${a.icon} ${a.name}!`);
+        }
+    });
+    if (changed) {
+        syncToCloud();
+        updateAchievements();
+    }
+}
 
 function updateAchievements() {
     const grid = document.getElementById('achievementsList');
@@ -58,7 +74,7 @@ function updateAchievements() {
     `).join('');
 }
 
-// === ЯЗВИТЕЛЬНЫЕ ФРАЗЫ ===
+// === Язвительные фразы ===
 const RATING_COMMENTS = {
     1: ["Серьёзно? 😂", "Даже бот расстроен...", "Это вообще задача была?", "Ну хоть что-то сделал...", "Позор джунглям 🦥"],
     2: ["Лучше бы Netflix смотрел", "Кот справился бы лучше", "Минус карма", "Ты хоть пытался?", "Пальцем шевельнул?"],
@@ -91,6 +107,7 @@ document.getElementById('createTaskBtn').addEventListener('click', () => {
     if (!text) { toast('Введи текст задачи!'); return; }
     tasks.unshift({ id: Date.now().toString(), text, period: selectedPeriod, created: new Date().toISOString(), completed: false });
     syncToCloud();
+    checkAndAwardAchievements();
     toast('Задача создана ✅');
     document.getElementById('taskText').value = '';
     updateUI();
@@ -109,10 +126,11 @@ window.toggleTask = function(id) {
         task.completed = false;
         syncToCloud();
     }
+    checkAndAwardAchievements();
     updateUI();
 };
 
-// Оценка с язвительной фразой
+// Оценка
 function showRating(id) {
     ratingTaskId = id;
     const old = document.querySelector('.rating-modal');
@@ -140,7 +158,8 @@ function submitRating(r) {
         const comments = RATING_COMMENTS[r];
         const randomComment = comments[Math.floor(Math.random() * comments.length)];
         syncToCloud();
-        toast(`${randomComment} ⭐ ${r}/10`);  // ← Вот тут появляется фраза в приложении!
+        toast(`${randomComment} ⭐ ${r}/10`);
+        checkAndAwardAchievements();
     }
     closeRating();
     updateUI();
@@ -160,6 +179,25 @@ function toast(msg) {
     setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 2500);
 }
 
+// Иконки для рейтинга
+function getRatingStars(rating) {
+    if (!rating) return '';
+    const stars = ['⭐','🌟','💫','✨','🔥'];
+    const count = Math.ceil(rating / 2);
+    const color = rating >= 9 ? '#ff6b6b' : rating >= 7 ? '#ffd93d' : rating >= 5 ? '#6bcf7f' : '#6b7fcf';
+    return `<span style="color:${color}">${'⭐'.repeat(count)}</span> <span style="font-size:12px;color:${color}">${rating}/10</span>`;
+}
+
+// Иконки для периода
+function getPeriodIcon(period) {
+    return period === 'day' ? '☀️' : period === 'week' ? '📅' : '🌙';
+}
+
+// Иконки для статистики
+function getStatIcon(key) {
+    return key === 'total' ? '📋' : key === 'completed' ? '✅' : '📊';
+}
+
 function updateUI() {
     const list = document.getElementById('tasksList');
     if (!list) return;
@@ -168,18 +206,29 @@ function updateUI() {
     } else {
         list.innerHTML = tasks.map((t,i) => `
             <div class="task-item ${t.completed ? 'completed' : ''}" style="animation-delay:${i*0.05}s">
-                <div class="task-checkbox ${t.completed ? 'checked' : ''}" onclick="toggleTask('${t.id}')"></div>
+                <div class="task-checkbox ${t.completed ? 'checked' : ''}" onclick="toggleTask('${t.id}')">
+                    ${t.completed ? '✅' : ''}
+                </div>
                 <div style="flex:1">
-                    <div style="font-weight:500">${t.text}</div>
-                    ${t.rating ? `<div style="font-size:12px;color:#a855f7">⭐ ${t.rating}/10</div>` : ''}
+                    <div style="font-weight:500">
+                        <span style="margin-right:6px">${getPeriodIcon(t.period)}</span>
+                        ${t.text}
+                    </div>
+                    ${t.rating ? `<div style="margin-top:4px">${getRatingStars(t.rating)}</div>` : ''}
                 </div>
             </div>
         `).join('');
     }
-    document.getElementById('totalTasks').textContent = tasks.length;
-    document.getElementById('completedTasks').textContent = tasks.filter(t => t.completed).length;
+    
+    // Статистика с иконками
+    const totalTasks = tasks.length;
+    const completedTasks = tasks.filter(t => t.completed).length;
     const rated = tasks.filter(t => t.rating);
-    document.getElementById('avgRating').textContent = rated.length ? (rated.reduce((s,t) => s + t.rating, 0) / rated.length).toFixed(1) : '0';
+    const avgRating = rated.length ? (rated.reduce((s,t) => s + t.rating, 0) / rated.length).toFixed(1) : '0';
+    
+    document.getElementById('totalTasks').innerHTML = `📋 ${totalTasks}`;
+    document.getElementById('completedTasks').innerHTML = `✅ ${completedTasks}`;
+    document.getElementById('avgRating').innerHTML = `⭐ ${avgRating}`;
 }
 
 // Стили
@@ -193,6 +242,8 @@ style.textContent = `
     .star-btn{width:40px;height:40px;border:1px solid rgba(255,255,255,0.2);border-radius:50%;background:rgba(255,255,255,0.1);color:white;font-size:16px;cursor:pointer}
     .star-btn:active{background:rgba(168,85,247,0.5)}
     .cancel-btn{padding:8px 16px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#fff;cursor:pointer}
+    .task-checkbox.checked{background:linear-gradient(135deg,#a855f7,#3b82f6);border-color:transparent;display:flex;align-items:center;justify-content:center}
+    .stat-value{display:flex;align-items:center;gap:4px;justify-content:center}
 `;
 document.head.appendChild(style);
 
