@@ -1,7 +1,7 @@
 const tg = window.Telegram.WebApp;
 tg.expand();
 
-console.log('TaskTamer v12 - фикс загрузки');
+console.log('TaskTamer v13 - фикс новых пользователей');
 
 const CLOUD_KEY = 'tasktamer_sync';
 
@@ -18,7 +18,7 @@ function loadStateFromURL() {
     const urlParams = new URLSearchParams(window.location.search);
     const startParam = urlParams.get('start');
     if (!startParam) {
-        console.log('Нет параметра start');
+        console.log('Нет параметра start, показываем пустой список');
         updateUI();
         updateAchievements();
         return;
@@ -43,7 +43,6 @@ function loadStateFromURL() {
     }
     updateUI();
     updateAchievements();
-    checkAndAwardAchievements();
 }
 
 function loadFromCloud() {
@@ -58,7 +57,7 @@ function loadFromCloud() {
                 updateAchievements();
                 checkAndAwardAchievements();
             } catch(e) {
-                console.error(e);
+                console.error('Ошибка облака:', e);
                 loadStateFromURL();
             }
         } else {
