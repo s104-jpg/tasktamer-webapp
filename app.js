@@ -1,9 +1,8 @@
 const tg = window.Telegram.WebApp;
 tg.expand();
 
-console.log('TaskTamer v11 - финальный дизайн');
+console.log('TaskTamer v12 - фикс загрузки');
 
-// === Облачное хранилище ===
 const CLOUD_KEY = 'tasktamer_sync';
 
 function syncToCloud() {
@@ -15,6 +14,38 @@ function syncToCloud() {
     localStorage.setItem('tasktamer_achievements', JSON.stringify(earnedAchievements));
 }
 
+function loadStateFromURL() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const startParam = urlParams.get('start');
+    if (!startParam) {
+        console.log('Нет параметра start');
+        updateUI();
+        updateAchievements();
+        return;
+    }
+    try {
+        const binaryStr = atob(startParam.replace(/-/g, '+').replace(/_/g, '/'));
+        const bytes = new Uint8Array(binaryStr.length);
+        for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+        const jsonStr = new TextDecoder('utf-8').decode(bytes);
+        const state = JSON.parse(jsonStr);
+        if (state.tasks) {
+            tasks = state.tasks;
+            localStorage.setItem('taskTamer_tasks', JSON.stringify(tasks));
+        }
+        if (state.achievements) {
+            earnedAchievements = state.achievements;
+            localStorage.setItem('taskTamer_achievements', JSON.stringify(earnedAchievements));
+        }
+        console.log('📦 Загружено из URL:', tasks.length, 'задач');
+    } catch(e) {
+        console.error('Ошибка URL:', e);
+    }
+    updateUI();
+    updateAchievements();
+    checkAndAwardAchievements();
+}
+
 function loadFromCloud() {
     tg.CloudStorage.getItem(CLOUD_KEY, (err, val) => {
         if (!err && val) {
@@ -22,15 +53,21 @@ function loadFromCloud() {
                 const data = JSON.parse(val);
                 tasks = data.tasks || [];
                 earnedAchievements = data.achievements || [];
-            } catch(e) { console.error(e); }
+                console.log('☁️ Загружено из облака:', tasks.length, 'задач');
+                updateUI();
+                updateAchievements();
+                checkAndAwardAchievements();
+            } catch(e) {
+                console.error(e);
+                loadStateFromURL();
+            }
+        } else {
+            console.log('Облако пустое, пробую URL...');
+            loadStateFromURL();
         }
-        updateUI();
-        updateAchievements();
-        checkAndAwardAchievements();
     });
 }
 
-// === Достижения ===
 const ACHIEVEMENTS = [
     { key: "first_task", name: "Первый шаг", icon: "👶", check: () => tasks.length >= 1 },
     { key: "first_complete", name: "Покоритель", icon: "✅", check: () => tasks.filter(t => t.completed).length >= 1 },
@@ -69,7 +106,6 @@ function updateAchievements() {
     `).join('');
 }
 
-// === Язвительные фразы ===
 const RATING_COMMENTS = {
     1: ["Серьёзно? 😂", "Даже бот расстроен...", "Это вообще задача была?", "Ну хоть что-то сделал...", "Позор джунглям 🦥"],
     2: ["Лучше бы Netflix смотрел", "Кот справился бы лучше", "Минус карма", "Ты хоть пытался?", "Пальцем шевельнул?"],
@@ -83,7 +119,6 @@ const RATING_COMMENTS = {
     10: ["ИДЕАЛЬНО! 🏆", "Ты превзошёл себя!", "Бот плачет от счастья", "Лучший результат!", "Достоин отдельной ачивки!"]
 };
 
-// === Задачи ===
 let tasks = [];
 let selectedPeriod = 'day';
 let ratingTaskId = null;
@@ -201,19 +236,12 @@ function updateUI() {
             </div>
         `).join('');
     }
-    
-    // Статистика с иконками
-    const totalTasks = tasks.length;
-    const completedTasks = tasks.filter(t => t.completed).length;
+    document.getElementById('totalTasks').innerHTML = `📋 ${tasks.length}`;
+    document.getElementById('completedTasks').innerHTML = `✅ ${tasks.filter(t => t.completed).length}`;
     const rated = tasks.filter(t => t.rating);
-    const avgRating = rated.length ? (rated.reduce((s,t) => s + t.rating, 0) / rated.length).toFixed(1) : '0';
-    
-    document.getElementById('totalTasks').innerHTML = `📋 ${totalTasks}`;
-    document.getElementById('completedTasks').innerHTML = `✅ ${completedTasks}`;
-    document.getElementById('avgRating').innerHTML = `⭐ ${avgRating}`;
+    document.getElementById('avgRating').innerHTML = `⭐ ${rated.length ? (rated.reduce((s,t) => s + t.rating, 0) / rated.length).toFixed(1) : '0'}`;
 }
 
-// Стили
 const style = document.createElement('style');
 style.textContent = `
     .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(168,85,247,0.9);color:white;padding:12px 24px;border-radius:12px;font-size:14px;z-index:9999;transition:opacity 0.3s;pointer-events:none}
@@ -224,7 +252,6 @@ style.textContent = `
     .star-btn{width:40px;height:40px;border:1px solid rgba(255,255,255,0.2);border-radius:50%;background:rgba(255,255,255,0.1);color:white;font-size:16px;cursor:pointer}
     .star-btn:active{background:rgba(168,85,247,0.5)}
     .cancel-btn{padding:8px 16px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#fff;cursor:pointer}
-    .stat-value{font-size:28px;font-weight:700;background:linear-gradient(135deg,#a855f7,#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 `;
 document.head.appendChild(style);
 
