@@ -1,0 +1,57 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>TaskTamer</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <div class="animated-bg">
+            <div class="orb orb-1"></div>
+            <div class="orb orb-2"></div>
+            <div class="orb orb-3"></div>
+        </div>
+        <div class="glass-container">
+            <header class="header">
+                <div class="logo">
+                    <span class="logo-icon">⚡</span>
+                    <h1>TaskTamer</h1>
+                </div>
+                <p class="subtitle">Укротитель задач</p>
+            </header>
+            <div class="task-form glass-card">
+                <h2 class="form-title"><span class="emoji-bounce">🎯</span> Новая задача</h2>
+                <div class="input-group">
+                    <label class="input-label">Что нужно сделать?</label>
+                    <input type="text" id="taskText" class="glass-input" placeholder="Например: Покорить мир..." maxlength="200">
+                </div>
+                <div class="input-group">
+                    <label class="input-label">Период</label>
+                    <div class="period-selector">
+                        <button class="period-btn active" data-period="day"><span class="period-icon">☀️</span> День</button>
+                        <button class="period-btn" data-period="week"><span class="period-icon">📅</span> Неделя</button>
+                        <button class="period-btn" data-period="month"><span class="period-icon">🌙</span> Месяц</button>
+                    </div>
+                </div>
+                <button id="createTaskBtn" class="create-btn"><span class="btn-text">Создать задачу</span><span class="btn-icon">🚀</span></button>
+            </div>
+            <div class="tasks-section glass-card" id="tasksSection">
+                <h2 class="form-title"><span class="emoji-bounce">📋</span> Активные задачи</h2>
+                <div id="tasksList" class="tasks-list"><div class="empty-state"><span class="empty-icon">🎈</span><p>Пока задач нет. Создай первую!</p></div></div>
+            </div>
+            <div class="stats-section glass-card">
+                <h2 class="form-title"><span class="emoji-bounce">📊</span> Статистика</h2>
+                <div class="stats-grid">
+                    <div class="stat-item"><span class="stat-value" id="totalTasks">0</span><span class="stat-label">Всего</span></div>
+                    <div class="stat-item"><span class="stat-value" id="completedTasks">0</span><span class="stat-label">Сделано</span></div>
+                    <div class="stat-item"><span class="stat-value" id="avgRating">0</span><span class="stat-label">Средняя оценка</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
