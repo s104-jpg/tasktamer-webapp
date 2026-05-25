@@ -1,7 +1,7 @@
 const tg = window.Telegram.WebApp;
 tg.expand();
 
-console.log('TaskTamer v10 - иконки и цвета');
+console.log('TaskTamer v11 - финальный дизайн');
 
 // === Облачное хранилище ===
 const CLOUD_KEY = 'tasktamer_sync';
@@ -22,7 +22,6 @@ function loadFromCloud() {
                 const data = JSON.parse(val);
                 tasks = data.tasks || [];
                 earnedAchievements = data.achievements || [];
-                console.log('☁️ Загружено:', tasks.length, 'задач,', earnedAchievements.length, 'достижений');
             } catch(e) { console.error(e); }
         }
         updateUI();
@@ -31,7 +30,7 @@ function loadFromCloud() {
     });
 }
 
-// === Достижения с авто-проверкой ===
+// === Достижения ===
 const ACHIEVEMENTS = [
     { key: "first_task", name: "Первый шаг", icon: "👶", check: () => tasks.length >= 1 },
     { key: "first_complete", name: "Покоритель", icon: "✅", check: () => tasks.filter(t => t.completed).length >= 1 },
@@ -39,7 +38,6 @@ const ACHIEVEMENTS = [
     { key: "high_rating", name: "Отлично", icon: "🌟", check: () => tasks.some(t => t.rating === 10) },
     { key: "night_owl", name: "Ночная сова", icon: "🦉", check: () => tasks.some(t => { const h = new Date(t.created).getHours(); return h >= 23 || h < 5; }) },
     { key: "speedy", name: "Спринтер", icon: "⚡", check: () => tasks.some(t => t.completed && t.created && t.completed_at && (new Date(t.completed_at) - new Date(t.created)) < 3600000) },
-    { key: "comeback", name: "Возвращение", icon: "👋", check: () => false },
 ];
 let earnedAchievements = [];
 
@@ -49,13 +47,10 @@ function checkAndAwardAchievements() {
         if (!earnedAchievements.includes(a.key) && a.check()) {
             earnedAchievements.push(a.key);
             changed = true;
-            toast(`🏆 Достижение: ${a.icon} ${a.name}!`);
+            toast(`🏆 ${a.icon} ${a.name}!`);
         }
     });
-    if (changed) {
-        syncToCloud();
-        updateAchievements();
-    }
+    if (changed) { syncToCloud(); updateAchievements(); }
 }
 
 function updateAchievements() {
@@ -101,7 +96,6 @@ document.querySelectorAll('.period-btn').forEach(btn => {
     });
 });
 
-// Создание задачи
 document.getElementById('createTaskBtn').addEventListener('click', () => {
     const text = document.getElementById('taskText').value.trim();
     if (!text) { toast('Введи текст задачи!'); return; }
@@ -113,7 +107,6 @@ document.getElementById('createTaskBtn').addEventListener('click', () => {
     updateUI();
 });
 
-// Выполнение задачи
 window.toggleTask = function(id) {
     const task = tasks.find(t => t.id === id);
     if (!task) return;
@@ -130,7 +123,6 @@ window.toggleTask = function(id) {
     updateUI();
 };
 
-// Оценка
 function showRating(id) {
     ratingTaskId = id;
     const old = document.querySelector('.rating-modal');
@@ -179,23 +171,15 @@ function toast(msg) {
     setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 2500);
 }
 
-// Иконки для рейтинга
 function getRatingStars(rating) {
     if (!rating) return '';
-    const stars = ['⭐','🌟','💫','✨','🔥'];
     const count = Math.ceil(rating / 2);
     const color = rating >= 9 ? '#ff6b6b' : rating >= 7 ? '#ffd93d' : rating >= 5 ? '#6bcf7f' : '#6b7fcf';
     return `<span style="color:${color}">${'⭐'.repeat(count)}</span> <span style="font-size:12px;color:${color}">${rating}/10</span>`;
 }
 
-// Иконки для периода
 function getPeriodIcon(period) {
     return period === 'day' ? '☀️' : period === 'week' ? '📅' : '🌙';
-}
-
-// Иконки для статистики
-function getStatIcon(key) {
-    return key === 'total' ? '📋' : key === 'completed' ? '✅' : '📊';
 }
 
 function updateUI() {
@@ -206,9 +190,7 @@ function updateUI() {
     } else {
         list.innerHTML = tasks.map((t,i) => `
             <div class="task-item ${t.completed ? 'completed' : ''}" style="animation-delay:${i*0.05}s">
-                <div class="task-checkbox ${t.completed ? 'checked' : ''}" onclick="toggleTask('${t.id}')">
-                    ${t.completed ? '✅' : ''}
-                </div>
+                <div class="task-checkbox ${t.completed ? 'checked' : ''}" onclick="toggleTask('${t.id}')"></div>
                 <div style="flex:1">
                     <div style="font-weight:500">
                         <span style="margin-right:6px">${getPeriodIcon(t.period)}</span>
@@ -242,8 +224,7 @@ style.textContent = `
     .star-btn{width:40px;height:40px;border:1px solid rgba(255,255,255,0.2);border-radius:50%;background:rgba(255,255,255,0.1);color:white;font-size:16px;cursor:pointer}
     .star-btn:active{background:rgba(168,85,247,0.5)}
     .cancel-btn{padding:8px 16px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#fff;cursor:pointer}
-    .task-checkbox.checked{background:linear-gradient(135deg,#a855f7,#3b82f6);border-color:transparent;display:flex;align-items:center;justify-content:center}
-    .stat-value{display:flex;align-items:center;gap:4px;justify-content:center}
+    .stat-value{font-size:28px;font-weight:700;background:linear-gradient(135deg,#a855f7,#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 `;
 document.head.appendChild(style);
 
