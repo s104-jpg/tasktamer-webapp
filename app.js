@@ -1,5 +1,6 @@
 ﻿const tg = window.Telegram.WebApp;
 tg.expand();
+
 let tasks = JSON.parse(localStorage.getItem('taskTamer_tasks') || '[]');
 let selectedPeriod = 'day';
 
@@ -13,7 +14,10 @@ document.querySelectorAll('.period-btn').forEach(btn => {
 
 document.getElementById('createTaskBtn').addEventListener('click', () => {
     const text = document.getElementById('taskText').value.trim();
-    if (!text) return;
+    if (!text) {
+        alert('Введи текст задачи!');
+        return;
+    }
     const task = {
         id: Date.now().toString(),
         text,
@@ -23,12 +27,19 @@ document.getElementById('createTaskBtn').addEventListener('click', () => {
     };
     tasks.unshift(task);
     localStorage.setItem('taskTamer_tasks', JSON.stringify(tasks));
-    tg.sendData(JSON.stringify({
-        action: 'task_created',
-        task_id: task.id,
-        task_text: task.text,
-        period: task.period
-    }));
+    
+    try {
+        tg.sendData(JSON.stringify({
+            action: 'task_created',
+            task_id: task.id,
+            task_text: task.text,
+            period: task.period
+        }));
+        alert('Задача отправлена боту!');
+    } catch (e) {
+        alert('Ошибка отправки: ' + e.message);
+    }
+    
     document.getElementById('taskText').value = '';
     updateUI();
 });
@@ -58,7 +69,12 @@ window.toggleTask = function(taskId) {
     task.completed = !task.completed;
     localStorage.setItem('taskTamer_tasks', JSON.stringify(tasks));
     if (task.completed) {
-        tg.sendData(JSON.stringify({ action: 'task_completed', task_id: task.id }));
+        try {
+            tg.sendData(JSON.stringify({ action: 'task_completed', task_id: task.id }));
+            alert('Выполнение отмечено!');
+        } catch (e) {
+            alert('Ошибка отправки: ' + e.message);
+        }
     }
     updateUI();
 };
